@@ -27,6 +27,7 @@
             "outputPath": "dist/chessy",
             "index": "src/index.html",
             "browser": "src/main.ts",
+            "baseHref": "/ChessyUI/",
             "polyfills": [
               "zone.js"
             ],
