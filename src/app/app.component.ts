@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environment';
+import { timeout, catchError, of, TimeoutError } from 'rxjs';
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
@@ -40,18 +41,29 @@ export class AppComponent {
     formData.append('image', this.selectedFile);
 
     console.log('🔄 Starting image processing...');
-    this.http.post<any>(`${this.apiUrl}/upload`, formData).subscribe(
+    this.http.post<any>(`${this.apiUrl}/upload`, formData).pipe(
+      timeout(600000), // 10 minutes timeout
+      catchError(err => {
+        if (err instanceof TimeoutError) {
+          alert('Request timed out after 10 minutes. The server might be busy.');
+          this.isProcessing = false;
+        }
+        return of(null); // Complete the stream gracefully
+      })
+    ).subscribe(
       (response) => {
-        console.log('✅ Image processed successfully:', response);
-        this.isProcessing = false;
-        
-        if (response.chess_url) {
-          this.chessUrl = response.chess_url;
-          console.log('🔗 Chess URL received:', this.chessUrl);
-          alert(`Image processed successfully! Chess URL: ${this.chessUrl}`);
-        } else {
-          console.warn('⚠️ No chess URL in response');
-          alert('Image processed but no chess URL was generated.');
+        if (response) {
+          console.log('✅ Image processed successfully:', response);
+          this.isProcessing = false;
+          
+          if (response.chess_url) {
+            this.chessUrl = response.chess_url;
+            console.log('🔗 Chess URL received:', this.chessUrl);
+            alert(`Image processed successfully! Chess URL: ${this.chessUrl}`);
+          } else {
+            console.warn('⚠️ No chess URL in response');
+            alert('Image processed but no chess URL was generated.');
+          }
         }
       },
       (error) => {

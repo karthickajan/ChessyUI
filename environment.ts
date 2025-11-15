@@ -2,5 +2,5 @@
 export const environment = {
     production: false,
     HOST:'/api',
-    URL:'http://192.168.1.27:3000',
+    URL:'http://chessy-karthick-ajan-dev.apps.rm2.thpm.p1.openshiftapps.com',
   };
