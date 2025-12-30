@@ -1,50 +1,54 @@
-<!-- HTML for capturing or uploading an image -->
-<div class="upload-container">
+<div class="container">
   <h2>Chess Board Image Processor</h2>
-  
-  <div class="file-input-section">
-    <label for="uploadInput">Select Chess Board Image:</label>
-    <input type="file" id="uploadInput" (change)="onFileSelected($event)" accept="image/*">
+
+  <!-- Mode Toggles -->
+  <div class="mode-selection">
+    <button (click)="toggleCamera()" class="mode-btn camera-btn">
+      <span *ngIf="!isCameraOn">📷 Use Camera</span>
+      <span *ngIf="isCameraOn">🛑 Stop Camera</span>
+    </button>
+    <span class="or-divider">OR</span>
+    <label for="uploadInput" class="mode-btn upload-label">
+      📁 Upload File
+    </label>
+    <input type="file" id="uploadInput" (change)="onFileSelected($event)" accept="image/*" hidden>
+  </div>
+
+  <!-- Camera View -->
+  <div *ngIf="isCameraOn" class="camera-container">
+    <video #videoElement autoplay playsinline class="video-feed"></video>
+    <button (click)="capturePhoto()" class="capture-btn">📸 Snap Photo</button>
   </div>
   
-  <div class="upload-section">
-    <button 
-      (click)="uploadImage()" 
-      [disabled]="!selectedFile || isProcessing"
-      class="upload-btn">
+  <!-- Hidden canvas for capturing frame -->
+  <canvas #canvasElement style="display: none;"></canvas>
+
+  <!-- Image Preview & Process Button -->
+  <div *ngIf="selectedFile" class="preview-container">
+    <h3>Image Preview</h3>
+    <img [src]="selectedFile | toUrl" alt="Selected chess board" class="preview-image">
+    <div class="file-info">
+      <p><strong>File:</strong> {{ selectedFile.name }}</p>
+      <p><strong>Size:</strong> {{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</p>
+    </div>
+    <button (click)="processImage()" [disabled]="isProcessing" class="process-btn">
       <span *ngIf="!isProcessing">🚀 Process Image</span>
       <span *ngIf="isProcessing">⏳ Processing...</span>
     </button>
   </div>
 
-  <!-- Display selected file info -->
-  <div *ngIf="selectedFile" class="file-info">
-    <p><strong>Selected file:</strong> {{ selectedFile.name }}</p>
-    <p><strong>Size:</strong> {{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</p>
+  <!-- Processing Indicator -->
+  <div *ngIf="isProcessing" class="processing-indicator">
+    <p>🔄 Analyzing chess position...</p>
   </div>
 
-  <!-- Processing indicator -->
-  <div *ngIf="isProcessing" class="processing">
-    <p>🔄 Processing your chess board image...</p>
-    <p>This may take a few moments.</p>
-  </div>
-
-  <!-- Display chess URL result -->
-  <div *ngIf="chessUrl" class="result-section">
-    <h3>✅ Processing Complete!</h3>
-    <div class="chess-url-container">
-      <p><strong>Chess Position URL:</strong></p>
-      <div class="url-display">
-        <input type="text" [value]="chessUrl" readonly class="url-input">
-      </div>
-      <div class="url-actions">
-        <button (click)="openChessUrl()" class="action-btn open-btn">
-          🔗 Open in New Tab
-        </button>
-        <button (click)="copyChessUrl()" class="action-btn copy-btn">
-          📋 Copy URL
-        </button>
-      </div>
+  <!-- Result Display -->
+  <div *ngIf="chessUrl" class="result-container">
+    <h3>✅ Analysis Complete!</h3>
+    <div class="url-actions">
+      <input type="text" [value]="chessUrl" readonly class="url-input">
+      <button (click)="copyChessUrl()" class="action-btn">� Copy</button>
+      <button (click)="openChessUrl()" class="action-btn">� Open</button>
     </div>
   </div>
 </div>

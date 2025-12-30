@@ -1,69 +1,128 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environment';
-import { timeout, catchError, of, TimeoutError } from 'rxjs';
+
 @Component({
   selector: 'app-root',
   templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  styleUrls: ['./app.component.scss']
 })
-export class AppComponent {
+export class AppComponent implements OnDestroy {
   selectedFile: File | null = null;
   chessUrl: string | null = null;
   isProcessing: boolean = false;
+  isCameraOn = false;
+  stream: MediaStream | null = null;
+  
+  @ViewChild('videoElement') videoElement: ElementRef<HTMLVideoElement> | undefined;
+  @ViewChild('canvasElement') canvasElement: ElementRef<HTMLCanvasElement> | undefined;
+
   private apiUrl = environment.URL;
+
   constructor(private http: HttpClient) {}
 
-  // Handle file selection
+  ngOnDestroy(): void {
+    this.stopCamera();
+  }
+
+  // Handle file selection from input
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files.length > 0) {
       this.selectedFile = input.files[0];
+      this.chessUrl = null; // Reset result
     }
   }
 
-  // Upload the image to the backend
-  uploadImage(): void {
-    console.log('🚀 uploadImage called');
-    console.log('📍 API URL:', this.apiUrl);
+  // Toggle camera on/off
+  async toggleCamera(): Promise<void> {
+    if (this.isCameraOn) {
+      this.stopCamera();
+    } else {
+      await this.startCamera();
+    }
+  }
+
+  private async startCamera(): Promise<void> {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        this.isCameraOn = true;
+        this.selectedFile = null; // Clear previous selection
+        this.chessUrl = null;
+        // Use a timeout to ensure the video element is available after *ngIf
+        setTimeout(() => {
+          if (this.videoElement) {
+            this.videoElement.nativeElement.srcObject = this.stream;
+          }
+        });
+      } else {
+        alert('Your browser does not support camera access.');
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      alert('Could not access the camera. Please ensure you have given permission.');
+    }
+  }
+
+  private stopCamera(): void {
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop());
+      this.isCameraOn = false;
+      this.stream = null;
+    }
+  }
+
+  // Capture a photo from the video stream
+  capturePhoto(): void {
+    if (!this.videoElement || !this.canvasElement) {
+      console.error('Video or canvas element not found.');
+      return;
+    }
+    const video = this.videoElement.nativeElement;
+    const canvas = this.canvasElement.nativeElement;
     
+    // Set canvas dimensions to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Create a file from the canvas image
+      canvas.toBlob((blob) => {
+        if (blob) {
+          this.selectedFile = new File([blob], `capture-${new Date().toISOString()}.png`, { type: 'image/png' });
+          this.stopCamera(); // Turn off camera after capture
+        }
+      }, 'image/png');
+    }
+  }
+
+  // Upload the selected file (from upload or camera)
+  processImage(): void {
     if (!this.selectedFile) {
-      console.error('❌ No file selected for upload.');
-      alert('Please select an image first.');
+      alert('Please select an image or capture a photo first.');
       return;
     }
     
-    console.log('📁 Selected file:', this.selectedFile);
+    console.log('� Processing image:', this.selectedFile.name);
     this.isProcessing = true;
     this.chessUrl = null; // Reset previous result
     
     const formData = new FormData();
     formData.append('image', this.selectedFile);
 
-    console.log('🔄 Starting image processing...');
-    this.http.post<any>(`${this.apiUrl}/upload`, formData).pipe(
-      timeout(600000), // 10 minutes timeout
-      catchError(err => {
-        if (err instanceof TimeoutError) {
-          alert('Request timed out after 10 minutes. The server might be busy.');
-          this.isProcessing = false;
-        }
-        return of(null); // Complete the stream gracefully
-      })
-    ).subscribe(
+    this.http.post<any>(`${this.apiUrl}/upload`, formData).subscribe(
       (response) => {
-        if (response) {
-          console.log('✅ Image processed successfully:', response);
-          this.isProcessing = false;
-          
-          if (response.chess_url) {
-            this.chessUrl = response.chess_url;
-            console.log('🔗 Chess URL received:', this.chessUrl);
-            alert(`Image processed successfully! Chess URL: ${this.chessUrl}`);
-          } else {
-            console.warn('⚠️ No chess URL in response');
-            alert('Image processed but no chess URL was generated.');
-          }
+        console.log('✅ Image processed successfully:', response);
+        this.isProcessing = false;
+        
+        if (response.chess_url) {
+          this.chessUrl = response.chess_url;
+        } else {
+          alert('Image processed, but no chess URL was returned.');
         }
       },
       (error) => {
